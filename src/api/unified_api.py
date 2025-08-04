@@ -289,16 +289,26 @@ def extract_openai_api_key(authorization: Optional[str] = Header(None)) -> str:
     return api_key
 
 
-def extract_anthropic_api_key(x_api_key: Optional[str] = Header(None, alias="x-api-key")) -> str:
-    """从Anthropic格式的x-api-key header中提取API key"""
+def extract_anthropic_api_key(x_api_key: Optional[str] = Header(None, alias="x-api-key"), authorization: Optional[str] = Header(None, alias="authorization")) -> str:
+    """从Anthropic格式的x-api-key header或Authorization header中提取API key"""
     logger.debug(f"Anthropic auth - Received x-api-key header: {mask_api_key(x_api_key) if x_api_key else 'None'}")
+    logger.debug(f"Anthropic auth - Received authorization header: {mask_api_key(authorization) if authorization else 'None'}")
     
-    if not x_api_key:
-        logger.error("Missing x-api-key header")
-        raise HTTPException(status_code=401, detail="Missing x-api-key header")
+    # 首先尝试从x-api-key获取token
+    if x_api_key:
+        logger.info(f"Extracted Anthropic API key from x-api-key: {mask_api_key(x_api_key)}")
+        return x_api_key
     
-    logger.debug(f"Extracted Anthropic API key: {mask_api_key(x_api_key)}")
-    return x_api_key
+    # 如果x-api-key不存在，尝试从Authorization header获取
+    if authorization and authorization.startswith("Bearer "):
+        api_key = authorization[7:]  # 移除 "Bearer " 前缀
+        logger.info(f"Extracted Anthropic API key from Authorization header: {mask_api_key(api_key)}")
+        return api_key
+    
+    # 如果两种方式都无法获取token，则报错
+    logger.error("Missing authentication: neither x-api-key nor valid Authorization header found")
+    error_detail = "Missing authentication. For Anthropic API format, please provide your API key either in the x-api-key header or as 'Bearer TOKEN' in the Authorization header."
+    raise HTTPException(status_code=401, detail=error_detail)
 
 
 def extract_gemini_api_key(request: Request) -> str:
@@ -1018,7 +1028,7 @@ async def handle_unified_request(request, api_key: str, source_format: str):
         
         # 2. 获取请求数据
         request_data = await request.json()
-        
+
         # 3. 验证必须字段
         if not request_data.get("model"):
             raise HTTPException(status_code=400, detail="Model name is required")
