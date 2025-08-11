@@ -27,6 +27,15 @@
     --color-success: #28a745;
     --color-warning: #ffc107;
     --color-info: #17a2b8;
+    
+    /* 状态颜色 - Light变体 */
+    --color-success-light: #c8e6c9;
+    --color-error-light: #ffcdd2;
+    --color-warning-light: #fff3cd;
+    --color-info-light: #d1ecf1;
+    
+    /* 边框颜色 */
+    --border-error: var(--color-error-light);
 
     /* 背景层级 - 更丰富的层次 */
     --bg-primary: linear-gradient(135deg, #fafafa 0%, #ffffff 50%, #f8f8f8 100%);
@@ -991,16 +1000,11 @@ body::before {
 .status-supported {
     background: linear-gradient(135deg, #e8f5e8, #f1f8e9);
     color: var(--text-success);
-    border: 1px solid #c8e6c9;
+    border: 1px solid var(--color-success-light);
     box-shadow: 0 2px 8px rgba(45, 125, 50, 0.1);
 }
 
-.status-not-supported {
-    background: linear-gradient(135deg, #ffeaea, #ffebee);
-    color: var(--text-error);
-    border: 1px solid #ffcdd2;
-    box-shadow: 0 2px 8px rgba(198, 40, 40, 0.1);
-}
+/* 注意：.status-not-supported 规则已移至后面统一定义（约1901行） */
 
 /* 检测信息 */
 .detection-info {
@@ -1051,9 +1055,10 @@ body::before {
     background: linear-gradient(135deg, #ffeaea, #ffebee);
     color: var(--text-error);
     padding: var(--space-lg);
-    border: 1px solid #ffcdd2;
-    border-radius: var(--radius-none);
+    border: 1px solid var(--border-error);
+    border-radius: var(--radius-md);
     margin-bottom: var(--space-lg);
+    margin-top: var(--space-lg);
     font-size: 0.875rem;
     font-weight: 500;
     position: relative;
@@ -1067,7 +1072,7 @@ body::before {
     left: 0;
     width: 4px;
     height: 100%;
-    background: linear-gradient(180deg, var(--text-error), #ffcdd2);
+    background: linear-gradient(180deg, var(--text-error), var(--border-error));
     animation: errorPulse 2s ease-in-out infinite;
 }
 
@@ -1719,14 +1724,7 @@ body::before {
     margin-top: var(--space-lg);
 }
 
-.error-message {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
-    padding: var(--space-md);
-    border-radius: var(--radius-md);
-    margin-top: var(--space-lg);
-    font-size: 0.875rem;
-}
+/* 注意：.error-message 规则已在前面定义（约1054行） */
 
 
 
@@ -1894,14 +1892,14 @@ body::before {
 .status-supported {
     background: linear-gradient(135deg, #e8f5e8, #f1f8e9);
     color: #2d7d32;
-    border: 1px solid #c8e6c9;
+    border: 1px solid var(--color-success-light);
     box-shadow: 0 2px 8px rgba(45, 125, 50, 0.1);
 }
 
 .status-not-supported {
     background: linear-gradient(135deg, #ffeaea, #ffebee);
-    color: var(--color-error);
-    border: 1px solid #ffcdd2;
+    color: var(--text-error);
+    border: 1px solid var(--color-error-light);
     box-shadow: 0 2px 8px rgba(198, 40, 40, 0.1);
 }
 
@@ -1956,19 +1954,7 @@ body::before {
     font-size: 0.75rem;
 }
 
-/* 更新错误消息样式 */
-.error-message {
-    background: linear-gradient(135deg, #ffeaea, #ffebee);
-    color: var(--color-error);
-    padding: var(--space-lg);
-    border: 1px solid #ffcdd2;
-    border-radius: var(--radius-md);
-    margin-bottom: var(--space-lg);
-    font-size: 0.875rem;
-    font-weight: 500;
-    position: relative;
-    border-left: 4px solid var(--color-error);
-}
+/* 注意：.error-message 规则已在前面定义（约1054行） */
 
 /* 动画类 */
 .fade-in {
@@ -2166,14 +2152,14 @@ body::before {
     background: linear-gradient(135deg, #e8f5e8, #f1f8e9);
     color: var(--text-success);
     border-left-color: var(--text-success);
-    border: 1px solid #c8e6c9;
+    border: 1px solid var(--color-success-light);
 }
 
 .message.error {
     background: linear-gradient(135deg, #ffeaea, #ffebee);
     color: var(--text-error);
     border-left-color: var(--text-error);
-    border: 1px solid #ffcdd2;
+    border: 1px solid var(--color-error-light);
 }
 
 .message.success::before {
@@ -2212,12 +2198,12 @@ body::before {
 
 .test-result.success {
     background: linear-gradient(135deg, #e8f5e8, #f1f8e9);
-    border: 1px solid #c8e6c9;
+    border: 1px solid var(--color-success-light);
 }
 
 .test-result.error {
     background: linear-gradient(135deg, #ffeaea, #ffebee);
-    border: 1px solid #ffcdd2;
+    border: 1px solid var(--color-error-light);
 }
 
 .test-result h4 {
