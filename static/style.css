@@ -21,6 +21,12 @@
     --color-accent-dark: #b8941f;
     --color-rose-gold: #e8b4a6;
     --color-platinum: #e5e4e2;
+    
+    /* 状态颜色 */
+    --color-error: #dc3545;
+    --color-success: #28a745;
+    --color-warning: #ffc107;
+    --color-info: #17a2b8;
 
     /* 背景层级 - 更丰富的层次 */
     --bg-primary: linear-gradient(135deg, #fafafa 0%, #ffffff 50%, #f8f8f8 100%);
