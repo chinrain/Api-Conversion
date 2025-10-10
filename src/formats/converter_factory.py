@@ -7,6 +7,7 @@ from .base_converter import BaseConverter, ConversionResult
 from .openai_converter import OpenAIConverter
 from .anthropic_converter import AnthropicConverter
 from .gemini_converter import GeminiConverter
+from .responses_converter import ResponsesConverter
 from src.utils.logger import setup_logger
 
 logger = setup_logger("converter_factory")
@@ -31,9 +32,10 @@ class ConverterFactory:
         converters = {
             "openai": OpenAIConverter,
             "anthropic": AnthropicConverter,
-            "gemini": GeminiConverter
+            "gemini": GeminiConverter,
+            "responses": ResponsesConverter
         }
-        
+
         converter_class = converters.get(format_name)
         if converter_class:
             logger.info(f"Created converter for format: {format_name}")
@@ -45,7 +47,7 @@ class ConverterFactory:
     @classmethod
     def get_supported_formats(cls) -> list[str]:
         """获取支持的格式列表"""
-        return ["openai", "anthropic", "gemini"]
+        return ["openai", "anthropic", "gemini", "responses"]
     
     @classmethod
     def is_format_supported(cls, format_name: str) -> bool:
@@ -151,6 +153,8 @@ def convert_streaming_chunk(source_format: str, target_format: str, data: dict, 
             return converter._convert_from_gemini_streaming_chunk(data)
         elif source_format == "anthropic" and hasattr(converter, '_convert_from_anthropic_streaming_chunk'):
             return converter._convert_from_anthropic_streaming_chunk(data)
+        elif source_format == "responses" and hasattr(converter, '_convert_from_responses_streaming_chunk'):
+            return converter._convert_from_responses_streaming_chunk(data)
     elif target_format == "anthropic":
         if source_format == "openai" and hasattr(converter, '_convert_from_openai_streaming_chunk'):
             logger.debug(f"Calling _convert_from_openai_streaming_chunk for {source_format} -> {target_format}")
@@ -158,13 +162,34 @@ def convert_streaming_chunk(source_format: str, target_format: str, data: dict, 
         elif source_format == "gemini" and hasattr(converter, '_convert_from_gemini_streaming_chunk'):
             logger.debug(f"Calling _convert_from_gemini_streaming_chunk for {source_format} -> {target_format}")
             return converter._convert_from_gemini_streaming_chunk(data)
+        elif source_format == "responses" and hasattr(converter, '_convert_from_responses_streaming_chunk'):
+            return converter._convert_from_responses_streaming_chunk(data)
     elif target_format == "gemini":
         if source_format == "openai" and hasattr(converter, '_convert_from_openai_streaming_chunk'):
             return converter._convert_from_openai_streaming_chunk(data)
         elif source_format == "anthropic" and hasattr(converter, '_convert_from_anthropic_streaming_chunk'):
             return converter._convert_from_anthropic_streaming_chunk(data)
+        elif source_format == "responses" and hasattr(converter, '_convert_from_responses_streaming_chunk'):
+            return converter._convert_from_responses_streaming_chunk(data)
+    elif target_format == "responses":
+        # 处理转换为responses格式的流式转换
+        if source_format == "openai" and hasattr(converter, '_convert_from_openai_streaming_chunk'):
+            # 首先转换为chat completions格式，然后转换为responses格式
+            chat_result = converter._convert_from_openai_streaming_chunk(data)
+            if chat_result and chat_result.success:
+                # 然后将Chat Completions格式转换为Responses格式
+                responses_data = converter._convert_from_chat_completions(chat_result.data)
+                return ConversionResult(success=True, data=responses_data)
+        elif source_format == "anthropic" and hasattr(converter, '_convert_from_anthropic_streaming_chunk'):
+            chat_result = converter._convert_from_anthropic_streaming_chunk(data)
+            if chat_result and chat_result.success:
+                responses_data = converter._convert_from_chat_completions(chat_result.data)
+                return ConversionResult(success=True, data=responses_data)
         elif source_format == "gemini" and hasattr(converter, '_convert_from_gemini_streaming_chunk'):
-            return converter._convert_from_gemini_streaming_chunk(data)
+            chat_result = converter._convert_from_gemini_streaming_chunk(data)
+            if chat_result and chat_result.success:
+                responses_data = converter._convert_from_chat_completions(chat_result.data)
+                return ConversionResult(success=True, data=responses_data)
     
     # 如果没有专门的流式转换方法，检查是否是[DONE]标记或空数据
     if not data or (isinstance(data, dict) and not data) or (isinstance(data, str) and data.strip() == "[DONE]"):
