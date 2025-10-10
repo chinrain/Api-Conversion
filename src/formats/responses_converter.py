@@ -41,28 +41,30 @@ class ResponsesConverter(BaseConverter):
         target_format: str,
         headers: Optional[Dict[str, str]] = None
     ) -> ConversionResult:
-        """转换Responses请求到目标格式"""
+        """转换请求格式"""
         try:
-            # 首先将Responses格式转换为Chat Completions格式
-            chat_data = self._convert_to_chat_completions(data)
-
-            # 然后使用OpenAI转换器转换到目标格式
-            if target_format == "openai":
-                return ConversionResult(success=True, data=chat_data)
-            elif target_format == "anthropic":
-                return self.openai_converter._convert_to_anthropic_request(chat_data)
-            elif target_format == "gemini":
-                return self.openai_converter._convert_to_gemini_request(chat_data)
-            elif target_format == "responses":
-                # Responses到Responses，直接返回
+            if target_format == "responses":
+                # 任何格式到Responses格式，进行直接转换
                 return ConversionResult(success=True, data=data)
             else:
-                return ConversionResult(
-                    success=False,
-                    error=f"Unsupported target format: {target_format}"
-                )
+                # 从Responses格式到其他格式
+                # 首先转换为Chat Completions格式作为中间步骤
+                chat_data = self._convert_to_chat_completions(data)
+
+                # 然后转换到目标格式
+                if target_format == "openai":
+                    return ConversionResult(success=True, data=chat_data)
+                elif target_format == "anthropic":
+                    return self.openai_converter._convert_to_anthropic_request(chat_data)
+                elif target_format == "gemini":
+                    return self.openai_converter._convert_to_gemini_request(chat_data)
+                else:
+                    return ConversionResult(
+                        success=False,
+                        error=f"Unsupported target format: {target_format}"
+                    )
         except Exception as e:
-            self.logger.error(f"Failed to convert Responses request to {target_format}: {e}")
+            self.logger.error(f"Failed to convert request to {target_format}: {e}")
             return ConversionResult(success=False, error=str(e))
 
     def convert_response(
@@ -71,39 +73,29 @@ class ResponsesConverter(BaseConverter):
         source_format: str,
         target_format: str
     ) -> ConversionResult:
-        """转换响应到Responses格式"""
+        """转换响应格式"""
         try:
             if target_format == "responses":
+                # 任何源格式到Responses格式，进行直接转换
                 if source_format == "responses":
                     return ConversionResult(success=True, data=data)
+                elif source_format == "openai":
+                    # 直接从OpenAI格式转换为Responses格式
+                    return self._convert_from_openai_to_responses(data)
+                elif source_format == "anthropic":
+                    # 直接从Anthropic格式转换为Responses格式
+                    return self._convert_from_anthropic_to_responses(data)
+                elif source_format == "gemini":
+                    # 直接从Gemini格式转换为Responses格式
+                    return self._convert_from_gemini_to_responses(data)
                 else:
-                    # 将其他格式转换为Chat Completions格式，然后转换为Responses格式
-                    self.openai_converter.set_original_model(self.original_model)
-
-                    if source_format == "openai":
-                        chat_response = data
-                    elif source_format == "anthropic":
-                        chat_result = self.openai_converter._convert_from_anthropic_response(data)
-                        if not chat_result.success:
-                            return ConversionResult(success=False, error=chat_result.error)
-                        chat_response = chat_result.data
-                    elif source_format == "gemini":
-                        chat_result = self.openai_converter._convert_from_gemini_response(data)
-                        if not chat_result.success:
-                            return ConversionResult(success=False, error=chat_result.error)
-                        chat_response = chat_result.data
-                    else:
-                        return ConversionResult(
-                            success=False,
-                            error=f"Unsupported source format: {source_format}"
-                        )
-
-                    # 将Chat Completions响应转换为Responses格式
-                    responses_data = self._convert_from_chat_completions(chat_response)
-                    return ConversionResult(success=True, data=responses_data)
+                    return ConversionResult(
+                        success=False,
+                        error=f"Unsupported source format: {source_format}"
+                    )
             else:
-                # 从Responses格式转换到其他格式
-                # 首先转换为Chat Completions格式
+                # 从Responses格式到其他格式
+                # 首先转换为Chat Completions格式作为中间步骤
                 chat_data = self._convert_to_chat_completions(data) if source_format == "responses" else data
 
                 # 然后转换到目标格式
@@ -111,7 +103,7 @@ class ResponsesConverter(BaseConverter):
                 return self.openai_converter.convert_response(chat_data, source_format, target_format)
 
         except Exception as e:
-            self.logger.error(f"Failed to convert {source_format} response to Responses: {e}")
+            self.logger.error(f"Failed to convert {source_format} response to {target_format}: {e}")
             return ConversionResult(success=False, error=str(e))
 
     def _convert_to_chat_completions(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -322,3 +314,248 @@ class ResponsesConverter(BaseConverter):
         # Responses API的流式格式相对简单，直接透传给OpenAI格式处理
         # 如果目标格式是responses，直接返回
         return ConversionResult(success=True, data=data)
+
+    # 直接格式转换方法（避免中间Chat Completions步骤）
+    def _convert_from_openai_to_responses(self, data: Dict[str, Any]) -> ConversionResult:
+        """直接从OpenAI格式转换为Responses格式"""
+        try:
+            responses_data = {}
+
+            # 生成响应ID
+            responses_data["id"] = f"resp_{uuid.uuid4().hex[:24]}"
+            responses_data["object"] = "response"
+            responses_data["created_at"] = int(time.time())
+
+            # 处理状态
+            responses_data["status"] = "completed"
+
+            # 处理输出
+            if "choices" in data and data["choices"]:
+                choice = data["choices"][0]
+                message = choice.get("message", {})
+
+                output = []
+
+                # 处理文本内容
+                content = message.get("content", "")
+                if content:
+                    output.append({
+                        "type": "message",
+                        "id": f"msg_{uuid.uuid4().hex[:8]}",
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": content
+                            }
+                        ]
+                    })
+
+                # 处理工具调用
+                tool_calls = message.get("tool_calls", [])
+                for tool_call in tool_calls:
+                    function = tool_call.get("function", {})
+                    output.append({
+                        "type": "function_call",
+                        "id": tool_call.get("id", ""),
+                        "call_id": tool_call.get("id", ""),
+                        "name": function.get("name", ""),
+                        "arguments": function.get("arguments", "{}")
+                    })
+
+                responses_data["output"] = output
+
+            # 处理输入（echo input）
+            if "messages" in data:
+                # 将messages转换为input格式
+                responses_data["input"] = self._convert_messages_to_input(data["messages"])
+
+            # 处理使用情况
+            if "usage" in data:
+                usage = data["usage"]
+                responses_data["usage"] = {
+                    "prompt_tokens": usage.get("prompt_tokens", 0),
+                    "completion_tokens": usage.get("completion_tokens", 0),
+                    "total_tokens": usage.get("total_tokens", 0)
+                }
+
+            # 处理模型
+            if "model" in data:
+                responses_data["model"] = data["model"]
+
+            # 处理错误信息
+            if "error" in data:
+                responses_data["error"] = data["error"]
+
+            # 处理finish_reason
+            if "choices" in data and data["choices"]:
+                choice = data["choices"][0]
+                finish_reason = choice.get("finish_reason", "stop")
+                responses_data["status"] = self._map_finish_reason_to_status(finish_reason)
+
+            return ConversionResult(success=True, data=responses_data)
+        except Exception as e:
+            self.logger.error(f"Failed to convert from OpenAI to Responses: {e}")
+            return ConversionResult(success=False, error=str(e))
+
+    def _convert_from_anthropic_to_responses(self, data: Dict[str, Any]) -> ConversionResult:
+        """直接从Anthropic格式转换为Responses格式"""
+        try:
+            responses_data = {}
+
+            # 生成响应ID
+            responses_data["id"] = f"resp_{uuid.uuid4().hex[:24]}"
+            responses_data["object"] = "response"
+            responses_data["created_at"] = int(time.time())
+
+            # 处理状态
+            responses_data["status"] = "completed"
+
+            # 处理输出
+            output = []
+
+            # 处理文本内容
+            if "content" in data and isinstance(data["content"], list):
+                for content_item in data["content"]:
+                    if content_item.get("type") == "text":
+                        output.append({
+                            "type": "message",
+                            "id": f"msg_{uuid.uuid4().hex[:8]}",
+                            "role": "assistant",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": content_item.get("text", "")
+                                }
+                            ]
+                        })
+                    elif content_item.get("type") == "tool_use":
+                        output.append({
+                            "type": "function_call",
+                            "id": content_item.get("id", ""),
+                            "call_id": content_item.get("id", ""),
+                            "name": content_item.get("name", ""),
+                            "arguments": content_item.get("input", {})
+                        })
+
+            responses_data["output"] = output
+
+            # 处理输入（echo input）
+            # 在Anthropic格式中，输入通常通过其他方式传递，这里简化处理
+            if hasattr(self, '_original_input') and self._original_input:
+                responses_data["input"] = self._original_input
+
+            # 处理使用情况
+            if "usage" in data:
+                usage = data["usage"]
+                responses_data["usage"] = {
+                    "prompt_tokens": usage.get("input_tokens", 0),
+                    "completion_tokens": usage.get("output_tokens", 0),
+                    "total_tokens": usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
+                }
+
+            # 处理模型
+            if "model" in data:
+                responses_data["model"] = data["model"]
+
+            # 处理错误信息
+            if "error" in data:
+                responses_data["error"] = data["error"]
+
+            # 处理停止原因
+            if "stop_reason" in data:
+                stop_reason = data["stop_reason"]
+                if stop_reason == "end_turn":
+                    responses_data["status"] = "completed"
+                elif stop_reason == "max_tokens":
+                    responses_data["status"] = "completed"
+                elif stop_reason == "tool_use":
+                    responses_data["status"] = "completed"
+                else:
+                    responses_data["status"] = "completed"
+
+            return ConversionResult(success=True, data=responses_data)
+        except Exception as e:
+            self.logger.error(f"Failed to convert from Anthropic to Responses: {e}")
+            return ConversionResult(success=False, error=str(e))
+
+    def _convert_from_gemini_to_responses(self, data: Dict[str, Any]) -> ConversionResult:
+        """直接从Gemini格式转换为Responses格式"""
+        try:
+            responses_data = {}
+
+            # 生成响应ID
+            responses_data["id"] = f"resp_{uuid.uuid4().hex[:24]}"
+            responses_data["object"] = "response"
+            responses_data["created_at"] = int(time.time())
+
+            # 处理状态
+            responses_data["status"] = "completed"
+
+            # 处理输出
+            output = []
+
+            # 处理候选回复
+            if "candidates" in data and data["candidates"]:
+                candidate = data["candidates"][0]
+
+                # 处理文本内容
+                if "content" in candidate and "parts" in candidate["content"]:
+                    for part in candidate["content"]["parts"]:
+                        if "text" in part:
+                            output.append({
+                                "type": "message",
+                                "id": f"msg_{uuid.uuid4().hex[:8]}",
+                                "role": "assistant",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": part["text"]
+                                    }
+                                ]
+                            })
+                        elif "functionCall" in part:
+                            function_call = part["functionCall"]
+                            output.append({
+                                "type": "function_call",
+                                "id": f"func_{uuid.uuid4().hex[:8]}",
+                                "call_id": f"func_{uuid.uuid4().hex[:8]}",
+                                "name": function_call.get("name", ""),
+                                "arguments": json.dumps(function_call.get("args", {}))
+                            })
+
+                # 处理完成原因
+                if "finishReason" in candidate:
+                    finish_reason = candidate["finishReason"]
+                    if finish_reason == "STOP":
+                        responses_data["status"] = "completed"
+                    elif finish_reason == "MAX_TOKENS":
+                        responses_data["status"] = "completed"
+                    elif finish_reason == "SAFETY":
+                        responses_data["status"] = "canceled"
+                    else:
+                        responses_data["status"] = "completed"
+
+            responses_data["output"] = output
+
+            # 处理使用情况
+            if "usageMetadata" in data:
+                usage = data["usageMetadata"]
+                responses_data["usage"] = {
+                    "prompt_tokens": usage.get("promptTokenCount", 0),
+                    "completion_tokens": usage.get("candidatesTokenCount", 0),
+                    "total_tokens": usage.get("totalTokenCount", 0)
+                }
+
+            # 处理模型
+            if "model" in data:
+                responses_data["model"] = data["model"]
+
+            # 处理错误信息
+            if "error" in data:
+                responses_data["error"] = data["error"]
+
+            return ConversionResult(success=True, data=responses_data)
+        except Exception as e:
+            self.logger.error(f"Failed to convert from Gemini to Responses: {e}")
+            return ConversionResult(success=False, error=str(e))
