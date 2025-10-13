@@ -261,8 +261,8 @@ docker-compose down
 # 构建镜像
 docker build -t ai-api-detector .
 
-# 运行容器
-docker run -p 8000:8000 ai-api-detector
+# 运行容器（需要挂载数据目录以持久化数据）
+docker run -p 8000:8000 -v $(pwd)/data:/app/data -v $(pwd)/logs:/app/logs ai-api-detector
 ```
 
 ### 本地开发

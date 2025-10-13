@@ -235,8 +235,8 @@ Access http://localhost:8000 to use the system
 # Build image
 docker build -t ai-api-detector .
 
-# Run container
-docker run -p 8000:8000 ai-api-detector
+# Run the container (requires mounting the data directory to persist data)
+docker run -p 8000:8000 -v $(pwd)/data:/app/data -v $(pwd)/logs:/app/logs ai-api-detector
 ```
 
 ### Local Development
