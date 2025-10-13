@@ -1,0 +1,91 @@
+version: "3.8"
+
+services:
+  api:
+    # 使用预构建镜像（推荐）
+    image: ghcr.io/chinrain/api-conversion:0.2.4
+    # 或者本地构建（取消下面的注释，并注释掉上面的 image）
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    container_name: api-conversion
+    ports:
+      - "8000:8000"
+    volumes:
+      # SQLite 挂载 data 目录
+      - ./data:/app/data
+      - ./logs:/app/logs
+    environment:
+      # 必需配置
+      - ADMIN_PASSWORD=admin123
+      # 数据库配置 - SQLite（默认）
+      - DATABASE_TYPE=sqlite
+      - DATABASE_PATH=data/channels.db
+
+      # AI 服务配置（建议配置）
+      # - ANTHROPIC_MAX_TOKENS=32000 # Claude 模型最大 token 数限制
+      # - OPENAI_REASONING_MAX_TOKENS=32000 # OpenAI 思考模型 max_completion_tokens 默认值
+
+      # ============================================
+      # 数据库配置 - MySQL（可选，取消注释并注释掉上面的 SQLite）
+      # ============================================
+      # - DATABASE_TYPE=mysql
+      # - MYSQL_HOST=mysql
+      # - MYSQL_PORT=3306
+      # - MYSQL_USER=apiuser
+      # - MYSQL_PASSWORD=apipassword
+      # - MYSQL_DATABASE=api_conversion
+
+      # ============================================
+      # 可选配置
+      # ============================================
+      # - ENCRYPTION_KEY=
+      # - SESSION_SECRET_KEY=
+      # - WEB_PORT=3000
+      # - OPENAI_LOW_TO_ANTHROPIC_TOKENS=2048
+      # - OPENAI_MEDIUM_TO_ANTHROPIC_TOKENS=8192
+      # - OPENAI_HIGH_TO_ANTHROPIC_TOKENS=16384
+      # - OPENAI_LOW_TO_GEMINI_TOKENS=2048
+      # - OPENAI_MEDIUM_TO_GEMINI_TOKENS=8192
+      # - OPENAI_HIGH_TO_GEMINI_TOKENS=16384
+      # - ANTHROPIC_TO_OPENAI_LOW_REASONING_THRESHOLD=2048
+      # - ANTHROPIC_TO_OPENAI_HIGH_REASONING_THRESHOLD=16384
+      # - GEMINI_TO_OPENAI_LOW_REASONING_THRESHOLD=2048
+      # - GEMINI_TO_OPENAI_HIGH_REASONING_THRESHOLD=16384
+      # - LOG_LEVEL=WARNING
+      # - LOG_FILE=logs/app.log
+      # - LOG_MAX_DAYS=1
+
+    restart: unless-stopped
+
+    # 使用 MySQL 时取消下面的注释
+    # depends_on:
+    #   - mysql
+    # networks:
+    #   - api-network
+# ============================================
+# MySQL 数据库（可选）
+# ============================================
+# mysql:
+#   image: mysql:8.0
+#   container_name: api-conversion-mysql
+#   environment:
+#     - MYSQL_ROOT_PASSWORD=rootpassword
+#     - MYSQL_DATABASE=api_conversion
+#     - MYSQL_USER=apiuser
+#     - MYSQL_PASSWORD=apipassword
+#   volumes:
+#     - mysql-data:/var/lib/mysql
+#   ports:
+#     - "3306:3306"
+#   restart: unless-stopped
+#   networks:
+#     - api-network
+
+# volumes:
+#   mysql-data:
+
+# networks:
+#   api-network:
+#     driver: bridge
+

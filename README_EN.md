@@ -204,6 +204,31 @@ gemini -m your_model
 
 ## 🚢 Deployment Guide
 
+### Docker Compose Deployment (Recommended)
+
+```bash
+# 1. Clone the project
+cd Api-Conversion
+
+# 2. Start services (SQLite by default)
+docker-compose up -d
+
+# 3. View logs
+docker-compose logs -f
+
+# 4. Stop services
+docker-compose down
+```
+
+Access http://localhost:8000 to use the system
+
+**Configuration Notes:**
+
+- SQLite database is used by default, with data stored in the `./data` directory
+- To use MySQL, edit `docker-compose.yml` and uncomment the MySQL-related sections
+- Environment variables can be configured in the `.env` file or `docker-compose.yml`
+- Pre-built images are supported; simply modify the `image` field
+
 ### Docker Deployment
 
 ```bash
