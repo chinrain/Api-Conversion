@@ -488,8 +488,11 @@ async def forward_request_to_channel(
         logger.error(f"Non-streaming request timeout after {channel.timeout} seconds")
         raise TimeoutError(f"Non-streaming request timeout after {channel.timeout} seconds")
     except Exception as e:
-        logger.error(f"Non-streaming request failed: {e}")
-        raise APIError(f"Non-streaming request failed: {e}")
+        # 这一行将打印出根本原因，这才是你最需要的信息！
+        logger.error(f"Non-streaming request failed. Error: {e!r}, Cause: {e.__cause__!r}")
+        # 在抛出新异常时，把根本原因也包含进去
+        cause = e.__cause__
+        raise APIError(f"Non-streaming request failed: {repr(e)}. Underlying cause: {repr(cause)}")
 
 
 async def handle_streaming_response(response, channel, request_data, source_format):
@@ -504,6 +507,9 @@ async def handle_streaming_response(response, channel, request_data, source_form
         
         # 根据客户端期望的格式选择合适的结束标记
         if source_format == "openai":
+            end_marker = "data: [DONE]\n\n"
+        elif source_format == "responses":
+            # Responses格式使用类似OpenAI的结束标记
             end_marker = "data: [DONE]\n\n"
         elif source_format == "gemini":
             # Gemini不需要特殊的结束标记，最后一个chunk包含finishReason即可
@@ -829,6 +835,14 @@ async def unified_openai_format_endpoint(
     return await handle_unified_request(request, api_key, source_format="openai")
 
 
+# 统一的OpenAI Responses API端点
+@router.post("/v1/responses")
+async def unified_openai_responses_endpoint(
+    request: Request,
+    api_key: str = Depends(extract_openai_api_key)
+):
+    """OpenAI Responses格式统一端点（使用标准OpenAI认证）"""
+    return await handle_unified_request(request, api_key, source_format="responses")
 
 
 # 统一的模型列表端点：根据认证方式自动识别格式
@@ -838,13 +852,13 @@ async def list_models_unified(
     authorization: Optional[str] = Header(None),
     x_api_key: Optional[str] = Header(None, alias="x-api-key")
 ):
-    """统一的模型列表端点，根据认证方式自动识别OpenAI或Anthropic格式"""
+    """统一的模型列表端点，根据认证方式自动识别OpenAI、Anthropic或Responses格式"""
     try:
         # 根据认证方式确定格式和API key
         if authorization and authorization.startswith("Bearer "):
-            # OpenAI格式认证
+            # OpenAI格式认证（包括Responses格式）
             api_key = authorization[7:]
-            target_format = "openai"
+            target_format = "openai"  # 默认返回OpenAI格式，Responses格式也使用OpenAI认证
             logger.info(f"OpenAI format models request with API key: {mask_api_key(api_key)}")
         elif x_api_key:
             # Anthropic格式认证
@@ -853,19 +867,19 @@ async def list_models_unified(
             logger.info(f"Anthropic format models request with API key: {mask_api_key(api_key)}")
         else:
             raise HTTPException(status_code=401, detail="Missing authorization header")
-        
+
         channel = channel_manager.get_channel_by_custom_key(api_key)
         if not channel:
             logger.error(f"No channel found for API key: {mask_api_key(api_key)}")
             raise HTTPException(status_code=401, detail="Invalid API key")
-        
+
         logger.info(f"Found channel: {channel.name} (provider: {channel.provider})")
-        
+
         # 从目标渠道获取真实的模型列表，转换为指定格式
         models = await fetch_models_from_channel_for_format(channel, target_format)
-        
+
         logger.info(f"Returning {len(models)} {target_format} format models")
-        
+
         # 根据格式返回不同的响应结构
         if target_format == "openai":
             return {
@@ -879,7 +893,7 @@ async def list_models_unified(
                 "first_id": models[0]["id"] if models else None,
                 "last_id": models[-1]["id"] if models else None
             }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -1070,6 +1084,11 @@ async def handle_unified_request(request, api_key: str, source_format: str):
         # Anthropic格式需要max_tokens字段
         if source_format == "anthropic" and not request_data.get("max_tokens"):
             raise HTTPException(status_code=400, detail="max_tokens is required for Anthropic format")
+
+        # Responses格式的基本验证
+        if source_format == "responses":
+            if not request_data.get("input"):
+                raise HTTPException(status_code=400, detail="input is required for Responses format")
         
         logger.debug(f"Unified API: source_format={source_format}, key={mask_api_key(api_key)}, target_provider={channel.provider}")
         logger.debug(f"Request stream parameter: {request_data.get('stream', False)}")
