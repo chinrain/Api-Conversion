@@ -234,6 +234,7 @@ gemini -m your_model
 
 ```bash
 # 1. 克隆项目
+git clone https://github.com/chinrain/Api-Conversion.git
 cd Api-Conversion
 
 # 2. 启动服务（默认使用 SQLite）

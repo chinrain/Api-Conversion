@@ -208,6 +208,7 @@ gemini -m your_model
 
 ```bash
 # 1. Clone the project
+git clone https://github.com/chinrain/Api-Conversion.git
 cd Api-Conversion
 
 # 2. Start services (SQLite by default)
